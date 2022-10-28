@@ -8,6 +8,8 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 
 interface IOdpResourceAllocation {
     function deposit() external payable;
@@ -21,14 +23,15 @@ contract ODPStore is ERC721Enumerable, Ownable {
     Counters.Counter private _tokenIds;
 
     //Prices in NATIVE CURRENCY (ETH/MATIC/BNB)
-    uint256 public currentCreatePrice = 10000000000000000;
-    uint256 public currentUpdatePrice = 10000000000000000;
-    uint256 public currentChangeCodeNamePrice = 10000000000000000;
+    uint256 public currentCreatePrice = 200000000000000000;
+    uint256 public currentUpdatePrice = 100000000000000000;
+    uint256 public currentChangeCodeNamePrice = 400000000000000000;
 
     IOdpResourceAllocation public odpResourceAllocationAddress;
     
     string appBaseUri;
     string contractMetaData;
+    bool ownerCanBurn=true;
 
     mapping(string => uint256) public codeName_to_tokenId;
     mapping(uint256 => string) public tokenId_to_hashCustomerApp;
@@ -64,9 +67,11 @@ contract ODPStore is ERC721Enumerable, Ownable {
         contractMetaData = newUri;
     }
 
-    
+    function renouceBurnPrivilege() public onlyOwner {
+        ownerCanBurn=false;
+    }
 
-    function updateTokenCodename(string memory codename,uint256 tokenId) public {
+    function updateTokenCodename(string memory codename,uint256 tokenId) public payable {
         require(codeName_to_tokenId[codename] == 0, "Code name is not available");
         require(msg.sender == ownerOf(tokenId));
         string memory lastCodename=tokenId_to_codeName[tokenId];
@@ -76,7 +81,7 @@ contract ODPStore is ERC721Enumerable, Ownable {
         odpResourceAllocationAddress.deposit{value:currentChangeCodeNamePrice}();
     }
 
-    function updateTokenURI(string memory newUri,uint256 tokenId) public {
+    function updateTokenURI(string memory newUri,uint256 tokenId) public payable {
         require(msg.sender == ownerOf(tokenId));
         tokenId_to_hashCustomerApp[tokenId]=newUri;
         odpResourceAllocationAddress.deposit{value:currentUpdatePrice}();
@@ -87,13 +92,16 @@ contract ODPStore is ERC721Enumerable, Ownable {
     }
 
     function burn(uint256 tokenId) public {
-        require(msg.sender == ownerOf(tokenId));
+        require(msg.sender == ownerOf(tokenId)||(msg.sender==owner() &&  ownerCanBurn ),"not token owner or contract owner");
         string memory lastCodename=tokenId_to_codeName[tokenId];
         codeName_to_tokenId[lastCodename]=0;
         tokenId_to_hashCustomerApp[tokenId] = "";
         _burn(tokenId);
     }
-    
+
+    function setApproval(address tokenAddress, address guy, uint256 amount) public onlyOwner {
+        IERC20(tokenAddress).approve(guy, amount);   
+    }
 
     function createNewStore(string memory codename, string memory ipfs_app)
         public
