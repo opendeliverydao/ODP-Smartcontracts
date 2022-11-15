@@ -27,6 +27,13 @@ contract ODPStore is ERC721Enumerable, Ownable {
     uint256 public currentUpdatePrice = 100000000000000000;
     uint256 public currentChangeCodeNamePrice = 400000000000000000;
 
+    uint256 public stakeHolderCurrentCreatePrice = 200000000000000000;
+    uint256 public stakeHolderCurrentUpdatePrice = 100000000000000000;
+    uint256 public stakeHolderCurrentChangeCodeNamePrice = 400000000000000000;
+
+    uint256 public stakeHolderMinimumInWallet = 1000000000000000000;
+    IERC20 public stakeHolderTokenAddress;
+
     IOdpResourceAllocation public odpResourceAllocationAddress;
     
     string appBaseUri;
@@ -47,6 +54,26 @@ contract ODPStore is ERC721Enumerable, Ownable {
         odpResourceAllocationAddress = IOdpResourceAllocation(_odpResourceAllocationAddress);
     }
 
+    function updateStakeHolderMinimumInWallet(uint256 newValue) public onlyOwner {
+        stakeHolderMinimumInWallet = newValue;
+    }
+
+    function updateStakeHolderTokenAddress(address newAddress) public onlyOwner {
+        stakeHolderTokenAddress = IERC20(newAddress);
+    }
+
+    function updateStakeHolderCurrentCreatePrice(uint256 newPrice) public onlyOwner {
+        stakeHolderCurrentCreatePrice = newPrice;
+    }
+
+    function updateStakeHolderCurrentUpdatePrice(uint256 newPrice) public onlyOwner {
+        stakeHolderCurrentUpdatePrice = newPrice;
+    }
+
+    function updateStakeHolderCurrentChangeCodeNamePrice(uint256 newPrice) public onlyOwner {
+        stakeHolderCurrentChangeCodeNamePrice = newPrice;
+    }
+
     function updateCurrentCreatePrice(uint256 newPrice) public onlyOwner {
         currentCreatePrice = newPrice;
     }
@@ -58,6 +85,7 @@ contract ODPStore is ERC721Enumerable, Ownable {
     function updateCurrentChangeCodeNamePrice(uint256 newPrice) public onlyOwner {
         currentChangeCodeNamePrice = newPrice;
     }
+
 
     function updateBaseUri(string memory newBaseUri) public onlyOwner {
         appBaseUri = newBaseUri;
@@ -71,6 +99,16 @@ contract ODPStore is ERC721Enumerable, Ownable {
         ownerCanBurn=false;
     }
 
+    function isStakeHolder(address _address) public view returns (bool) {
+        bool ret=false;
+        if (address(stakeHolderTokenAddress)!=address(0)){
+            if (stakeHolderTokenAddress.balanceOf(_address) >= stakeHolderMinimumInWallet){
+                ret=true;
+            }
+        }
+        return ret;
+    }
+
     function updateTokenCodename(string memory codename,uint256 tokenId) public payable {
         require(codeName_to_tokenId[codename] == 0, "Code name is not available");
         require(msg.sender == ownerOf(tokenId));
@@ -78,13 +116,21 @@ contract ODPStore is ERC721Enumerable, Ownable {
         codeName_to_tokenId[codename]=tokenId;
         codeName_to_tokenId[lastCodename]=0;
         tokenId_to_codeName[tokenId]=codename;
-        odpResourceAllocationAddress.deposit{value:currentChangeCodeNamePrice}();
+        uint256 _price=currentChangeCodeNamePrice;
+        if (isStakeHolder(msg.sender)){
+            _price=stakeHolderCurrentChangeCodeNamePrice;
+        }
+        if (_price>0) odpResourceAllocationAddress.deposit{value:_price}();
     }
 
     function updateTokenURI(string memory newUri,uint256 tokenId) public payable {
         require(msg.sender == ownerOf(tokenId));
         tokenId_to_hashCustomerApp[tokenId]=newUri;
-        odpResourceAllocationAddress.deposit{value:currentUpdatePrice}();
+        uint256 _price=currentUpdatePrice;
+        if (isStakeHolder(msg.sender)){
+            _price=stakeHolderCurrentUpdatePrice;
+        }
+        if (_price>0) odpResourceAllocationAddress.deposit{value:_price}();
     }
 
     function transfer(address to, uint256 amount) public onlyOwner {
@@ -112,7 +158,13 @@ contract ODPStore is ERC721Enumerable, Ownable {
 
         uint256 tokenId = _tokenIds.current()+1;
         _safeMint(msg.sender, tokenId);
-        odpResourceAllocationAddress.deposit{value:currentCreatePrice}();
+        uint256 _price=currentCreatePrice;
+        if (isStakeHolder(msg.sender)){
+            _price=stakeHolderCurrentCreatePrice;
+        }
+        if (_price>0) {
+            odpResourceAllocationAddress.deposit{value:_price}();
+        } 
         _tokenIds.increment();
 
         codeName_to_tokenId[codename] = tokenId;
