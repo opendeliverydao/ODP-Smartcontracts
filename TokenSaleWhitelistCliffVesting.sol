@@ -113,12 +113,13 @@ contract TokenSaleWhitelistCliffVesting is Pausable, AccessControl,TokenAllocati
         require(msg.value >= currentPrice * (_quantity/1e18));
         require(currentPrice>0);
 
+        Address.sendValue(payable(sellerAddress), msg.value);
         emit Received(msg.sender, msg.value);
         tokenSold += _quantity;
         _updateUserTokenAllocation(msg.sender, _quantity);
     }
 
-    function purchaseTokenWithErc20(uint256 _quantity) public payable whenNotPaused afterStartSales beforeEndSales {
+    function purchaseTokenWithErc20(uint256 _quantity) public whenNotPaused afterStartSales beforeEndSales {
         require(_quantity >= minTokenAmount, "Sale: amount less than min");
         require(_quantity <= maxTokenAmount, "Sale: amount greater than max");
         uint256 sellerBalance=(IERC20(tokenAddress)).balanceOf(sellerAddress);
@@ -144,9 +145,17 @@ contract TokenSaleWhitelistCliffVesting is Pausable, AccessControl,TokenAllocati
     function sendTo(address _payee, uint256 _amount) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_payee != address(0) && _payee != address(this));
         require(_amount > 0 && _amount <= address(this).balance);
-        payable(_payee).transfer(_amount);
+        Address.sendValue(payable(_payee), _amount);
         emit Sent(_payee, _amount, address(this).balance);
     }    
+
+    function setMinQuantity(uint256 _quantity) public onlyRole(DEFAULT_ADMIN_ROLE){
+        minTokenAmount=_quantity;
+    }
+
+    function setMaxQuantity(uint256 _quantity) public onlyRole(DEFAULT_ADMIN_ROLE){
+        maxTokenAmount=_quantity;
+    }
 
     function setCurrentPrice(uint256 _currentPrice) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_currentPrice > 0);
